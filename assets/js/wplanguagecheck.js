@@ -143,47 +143,29 @@
             debugLog('Mostrando modal con fallback manual');
         }
 
-        var message = document.getElementById('wplanguagecheck-message');
-        var btnAccept = document.getElementById('wplanguagecheck-accept');
-        var btnContinue = document.getElementById('wplanguagecheck-continue');
         var btnClose = document.getElementById('wplanguagecheck-close');
         var title = document.getElementById('wplanguagecheck-title');
-        var country = (contextData && contextData.country) || 'your country';
         var titleText = (contextData && contextData.title_text) || 'Confirm your location';
-        var descriptionText = (contextData && contextData.description_text) || 'Select a region to see content specific to your location';
-        var currentCountryLabel = (contextData && contextData.current_country_label) || (btnContinue && btnContinue.textContent) || 'Current country';
-        var preferredCountryLabel = (contextData && contextData.preferred_country_label) || (btnAccept && btnAccept.textContent) || 'Suggested country';
-        var languageDetected = (contextData && contextData.language_detected) || 'unknown';
-        var visitorIp = (contextData && contextData.visitor_ip) || 'unknown';
-        var wpmlCurrentLanguageCookie = (contextData && contextData.wpml_current_language_cookie) || 'empty';
 
         if (title) {
             title.textContent = titleText;
         }
 
-        if (message) {
-            message.textContent = descriptionText;
-            debugLog('Mensaje del modal renderizado', {
-                visitor_ip: visitorIp,
-                wpml_current_language_cookie: wpmlCurrentLanguageCookie,
-                country: country,
-                title_text: titleText,
-                description_text: descriptionText,
-                current_country_label: currentCountryLabel,
-                preferred_country_label: preferredCountryLabel,
-                rendered_message: message.textContent,
-                language_detected: languageDetected
+        var actionsContainer = document.querySelector('.wplanguagecheck__actions');
+        if (actionsContainer && contextData && contextData.other_languages) {
+            actionsContainer.innerHTML = '';
+            contextData.other_languages.forEach(function(lang) {
+                var btn = document.createElement('a');
+                btn.className = 'wplanguagecheck-btn wplanguagecheck-btn--suggested';
+                btn.href = lang.url;
+                btn.textContent = lang.label;
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    setAcceptedCookie();
+                    window.location.href = lang.url;
+                });
+                actionsContainer.appendChild(btn);
             });
-        } else {
-            debugLog('No se encontró #wplanguagecheck-message');
-        }
-
-        if (btnContinue) {
-            btnContinue.textContent = currentCountryLabel;
-        }
-
-        if (btnAccept) {
-            btnAccept.textContent = preferredCountryLabel;
         }
 
         function closeModalAndRemember() {
@@ -200,16 +182,9 @@
             }
         }
 
-        if (btnContinue) {
-            btnContinue.addEventListener('click', function(){
-                debugLog('Click en Continuar');
-                closeModalAndRemember();
-            });
-        } else {
-            debugLog('No se encontró botón Continuar (#wplanguagecheck-continue)');
-        }
-
         if (btnClose) {
+            var closeText = (contextData && contextData.close_text) || 'Close';
+            btnClose.setAttribute('aria-label', closeText);
             btnClose.addEventListener('click', function(event){
                 debugLog('Click en Cerrar');
                 if (event) {
@@ -221,26 +196,6 @@
         } else {
             debugLog('No se encontró botón Cerrar (#wplanguagecheck-close)');
         }
-
-        if (btnAccept) {
-            btnAccept.addEventListener('click', function(){
-                debugLog('Click en Aceptar');
-                setAcceptedCookie();
-                debugLog('Cookie aceptada guardada en Aceptar');
-
-                var preferredUrl = (contextData && contextData.preferred_url) || '';
-                if (preferredUrl) {
-                    debugLog('Redirigiendo a preferred_url', preferredUrl);
-                    window.location.href = preferredUrl;
-                    return;
-                }
-
-                debugLog('No hay preferred_url, cerrando modal');
-                closeModalAndRemember();
-            });
-        } else {
-            debugLog('No se encontró botón Aceptar (#wplanguagecheck-accept)');
-        }
     }
 
     window.addEventListener('load', function(){
@@ -251,7 +206,7 @@
             return;
         }
 
-        debugLog('Web cargada: se solicitará contexto AJAX en 5 segundos');
+        debugLog('Web cargada: se solicitará contexto AJAX en medio segundo');
 
         setTimeout(function(){
             if (hasValidCookie()) {
@@ -267,6 +222,6 @@
 
                 initModalFlow(contextData);
             });
-        }, 5000);
+        }, 500);
     });
 })();

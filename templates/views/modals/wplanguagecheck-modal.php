@@ -11,10 +11,7 @@
                 <button type="button" id="wplanguagecheck-close" class="modal__close" data-micromodal-close aria-label="<?php echo esc_attr(__wpl('Close')); ?>"></button>
             </header>
             <main class="modal__content" id="wplanguagecheck-content">
-                <p id="wplanguagecheck-message"><?php echo __wpl('Location confirmation description'); ?></p>
                 <div class="wplanguagecheck__actions">
-                    <button id="wplanguagecheck-continue" class="wplanguagecheck-btn wplanguagecheck-btn--current"><?php echo __wpl('Current country option'); ?></button>
-                    <button id="wplanguagecheck-accept" class="wplanguagecheck-btn wplanguagecheck-btn--suggested"><?php echo __wpl('Suggested country option'); ?></button>
                 </div>
             </main>
         </div>

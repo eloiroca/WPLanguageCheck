@@ -15,7 +15,7 @@ if (!defined('URL_PLUGIN_WPLANGUAGECHECK')) {
     define('URL_PLUGIN_WPLANGUAGECHECK', plugin_dir_url(__FILE__));
 }
 if (!defined('ASSETS_VERSION_WPLANGUAGECHECK')) {
-    define('ASSETS_VERSION_WPLANGUAGECHECK', '1.0.19');
+    define('ASSETS_VERSION_WPLANGUAGECHECK', '1.0.30');
 }
 
 if (!defined('WPLANGUAGECHECK_COOKIE_NAME')) {
@@ -155,6 +155,19 @@ function wplanguagecheck_get_languages_config() {
     ];
 }
 
+function wplanguagecheck_get_clean_language_label($languageCode) {
+    $labels = [
+        'en' => 'English',
+        'es' => 'Español',
+        'ca' => 'Català',
+        'de' => 'Deutsch',
+        'ru' => 'Русский',
+        'fr' => 'Français',
+        'en-usa' => 'English USA',
+    ];
+    return $labels[strtolower($languageCode)] ?? $languageCode;
+}
+
 function wplanguagecheck_get_route_prefix_by_language($language) {
     $config = wplanguagecheck_get_languages_config();
     $language = strtolower((string) $language);
@@ -169,13 +182,36 @@ function wplanguagecheck_get_route_prefix_by_language($language) {
     return '/' . strtolower($slug) . '/';
 }
 
-function wplanguagecheck_get_language_country_label($language) {
+function wplanguagecheck_get_language_country_label($language, $targetLanguage = null) {
     $config = wplanguagecheck_get_languages_config();
     $language = strtolower((string) $language);
 
     if (empty($config[$language]['label'])) return strtoupper($language);
 
-    return __wpl($config[$language]['label']);
+    return __wpl($config[$language]['label'], $targetLanguage);
+}
+
+function wplanguagecheck_get_country_label_by_code($countryCode, $targetLanguage = null) {
+    $countryCode = strtoupper((string) $countryCode);
+    if ($countryCode === '') {
+        return __wpl('your country', $targetLanguage);
+    }
+
+    $config = wplanguagecheck_get_languages_config();
+    foreach ($config as $language => $data) {
+        if (empty($data['countries']) || !is_array($data['countries'])) continue;
+
+        $countries = array_map(static function($code) {
+            return strtoupper((string) $code);
+        }, $data['countries']);
+
+        if (in_array($countryCode, $countries, true)) {
+            $label = !empty($data['label']) ? $data['label'] : $countryCode;
+            return __wpl($label, $targetLanguage);
+        }
+    }
+
+    return $countryCode;
 }
 
 function wplanguagecheck_get_current_path_language() {
@@ -271,25 +307,39 @@ function wplanguagecheck_get_modal_context() {
 
 
 if (!function_exists('__wpl')) {
-    function wpbooking_translations_array() {
-        static $translations = null;
+    function wpbooking_translations_array($target_lang = null) {
+        static $translations = [];
 
-        if ($translations !== null) return $translations;
+        $lang = $target_lang ? $target_lang : (defined('LANG_WPLANGUAGECHECK') ? LANG_WPLANGUAGECHECK : 'en');
+        $lang = strtolower((string)$lang);
 
-        $lang = defined('LANG_WPLANGUAGECHECK') ? LANG_WPLANGUAGECHECK : 'en';
+        if (isset($translations[$lang])) return $translations[$lang];
+
         $path = DIRECTORI_PLUGIN_WPLANGUAGECHECK . "lang/$lang.php";
 
         if (file_exists($path)) {
-            $translations = include $path;
+            $translations[$lang] = include $path;
         } else {
-            $translations = []; // si no existe el archivo, usar inglés (cadenas originales)
+            // Intenta separar por _ o - para caer a un idioma base (ej: en_US o en-usa a en)
+            $base_lang = $lang;
+            if (strpos($base_lang, '_') !== false) {
+                $base_lang = explode('_', $base_lang)[0];
+            } elseif (strpos($base_lang, '-') !== false) {
+                $base_lang = explode('-', $base_lang)[0];
+            }
+            $base_path = DIRECTORI_PLUGIN_WPLANGUAGECHECK . "lang/$base_lang.php";
+            if (file_exists($base_path)) {
+                $translations[$lang] = include $base_path;
+            } else {
+                $translations[$lang] = [];
+            }
         }
 
-        return $translations;
+        return $translations[$lang];
     }
 
-    function __wpl($key) {
-        $translations = wpbooking_translations_array();
+    function __wpl($key, $target_lang = null) {
+        $translations = wpbooking_translations_array($target_lang);
         return $translations[$key] ?? $key;
     }
 }
@@ -329,23 +379,33 @@ function wplanguagecheck_ajax_get_modal_context() {
     $modalContext = wplanguagecheck_get_modal_context();
     $visitorIp = wplanguagecheck_get_client_ip();
     $wpmlCurrentLanguageCookie = wplanguagecheck_get_wpml_current_language_cookie();
-    $defaultCountry = __wpl('your country');
-    $country = !empty($modalContext['country']) ? $modalContext['country'] : $defaultCountry;
-    $currentCountryLabel = wplanguagecheck_get_language_country_label($modalContext['current_language']);
-    $preferredCountryLabel = wplanguagecheck_get_language_country_label($modalContext['preferred_language']);
+
+    $preferredLanguage = !empty($modalContext['preferred_language']) ? $modalContext['preferred_language'] : 'en';
+
+    $titleText = __wpl('Location confirmation title', $preferredLanguage);
+
+    $other_languages = [];
+    $all_languages = ['en', 'es', 'ca', 'de', 'ru', 'fr', 'en-usa'];
+    foreach ($all_languages as $lang_code) {
+        if ($lang_code === strtolower($preferredLanguage)) {
+            continue;
+        }
+        $other_languages[] = [
+            'code' => $lang_code,
+            'label' => wplanguagecheck_get_clean_language_label($lang_code),
+            'url' => wplanguagecheck_get_preferred_url($lang_code)
+        ];
+    }
 
     wp_send_json_success([
         'cookie_name' => WPLANGUAGECHECK_COOKIE_NAME,
         'language_detected' => LANG_WPLANGUAGECHECK,
         'should_show' => !empty($modalContext['should_show']),
-        'preferred_url' => $modalContext['preferred_url'],
         'visitor_ip' => $visitorIp,
         'wpml_current_language_cookie' => $wpmlCurrentLanguageCookie,
-        'country' => $country,
-        'title_text' => __wpl('Location confirmation title'),
-        'description_text' => __wpl('Location confirmation description'),
-        'current_country_label' => $currentCountryLabel,
-        'preferred_country_label' => $preferredCountryLabel,
+        'title_text' => $titleText,
+        'other_languages' => $other_languages,
+        'close_text' => __wpl('Close', $preferredLanguage),
     ]);
 }
 add_action('wp_ajax_wplanguagecheck_get_modal_context', 'wplanguagecheck_ajax_get_modal_context');

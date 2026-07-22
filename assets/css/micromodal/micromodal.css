@@ -74,13 +74,13 @@
   margin: 0;
   will-change: transform;
   -moz-osx-font-smoothing: grayscale;
-  -webkit-backface-visibility: hidden;
+  /*-webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   transition: -webkit-transform .25s ease-out;
   transition: transform .25s ease-out;
-  transition: transform .25s ease-out,-webkit-transform .25s ease-out;
+  transition: transform .25s ease-out,-webkit-transform .25s ease-out;*/
 }
 
 #modal-wplanguagecheck .modal__btn:focus, #modal-wplanguagecheck .modal__btn:hover {
@@ -120,8 +120,14 @@
 }
 
 @keyframes wplanguagecheck-mmslideIn {
-  from { transform: translateY(15%); }
-    to { transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(15%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes wplanguagecheck-mmslideOut {
