@@ -99,7 +99,7 @@ function wplanguagecheck_get_languages_config() {
             'slug' => '',
             'home_path' => '/',
             'is_default' => true,
-            'countries' => ['GB'],
+            'countries' => ['GB', 'CH'],
             'label' => 'England',
         ],
 
@@ -133,7 +133,7 @@ function wplanguagecheck_get_languages_config() {
         'de' => [
             'slug' => 'de',
             'home_path' => '/de/',
-            'countries' => ['DE', 'CH'],
+            'countries' => ['DE'],
             'label' => 'Germany',
         ],
 
@@ -197,18 +197,39 @@ function wplanguagecheck_get_country_label_by_code($countryCode, $targetLanguage
         return __wpl('your country', $targetLanguage);
     }
 
-    $config = wplanguagecheck_get_languages_config();
-    foreach ($config as $language => $data) {
-        if (empty($data['countries']) || !is_array($data['countries'])) continue;
+    $countries = [
+        'AD' => 'Andorra',
+        'AR' => 'Argentina',
+        'AU' => 'Australia',
+        'BO' => 'Bolivia',
+        'CH' => 'Switzerland',
+        'CL' => 'Chile',
+        'CO' => 'Colombia',
+        'CR' => 'Costa Rica',
+        'CU' => 'Cuba',
+        'DE' => 'Germany',
+        'DO' => 'Dominican Republic',
+        'EC' => 'Ecuador',
+        'ES' => 'Spain',
+        'FR' => 'France',
+        'GB' => 'United Kingdom',
+        'GT' => 'Guatemala',
+        'HN' => 'Honduras',
+        'MX' => 'Mexico',
+        'NI' => 'Nicaragua',
+        'NZ' => 'New Zealand',
+        'PA' => 'Panama',
+        'PE' => 'Peru',
+        'PY' => 'Paraguay',
+        'RU' => 'Russia',
+        'SV' => 'El Salvador',
+        'US' => 'United States',
+        'UY' => 'Uruguay',
+        'VE' => 'Venezuela',
+    ];
 
-        $countries = array_map(static function($code) {
-            return strtoupper((string) $code);
-        }, $data['countries']);
-
-        if (in_array($countryCode, $countries, true)) {
-            $label = !empty($data['label']) ? $data['label'] : $countryCode;
-            return __wpl($label, $targetLanguage);
-        }
+    if (!empty($countries[$countryCode])) {
+        return __wpl($countries[$countryCode], $targetLanguage);
     }
 
     return $countryCode;
@@ -270,13 +291,40 @@ function wplanguagecheck_get_preferred_url($preferredLanguage) {
 }
 
 function wplanguagecheck_is_cookie_defined() {
-    if (empty($_COOKIE[WPLANGUAGECHECK_COOKIE_NAME])) return false;
-    return sanitize_text_field(wp_unslash($_COOKIE[WPLANGUAGECHECK_COOKIE_NAME])) === '1';
+    if (!empty($_COOKIE[WPLANGUAGECHECK_COOKIE_NAME]) && sanitize_text_field(wp_unslash($_COOKIE[WPLANGUAGECHECK_COOKIE_NAME])) === '1') {
+        return true;
+    }
+    // Si la cookie de preferencia de idioma de WPML está definida, consideramos que ya tiene preferencia guardada
+    if (!empty(wplanguagecheck_get_wpml_preferred_language_cookie())) {
+        return true;
+    }
+    return false;
 }
 
 function wplanguagecheck_get_wpml_current_language_cookie() {
-    if (empty($_COOKIE['wp-wpml_current_language'])) return '';
-    return sanitize_text_field(wp_unslash($_COOKIE['wp-wpml_current_language']));
+    if (!empty($_COOKIE['wp-wpml_current_language'])) {
+        return sanitize_text_field(wp_unslash($_COOKIE['wp-wpml_current_language']));
+    }
+    if (!empty($_COOKIE['_wpml_current_language'])) {
+        return sanitize_text_field(wp_unslash($_COOKIE['_wpml_current_language']));
+    }
+    if (!empty($_COOKIE['wpml_current_language'])) {
+        return sanitize_text_field(wp_unslash($_COOKIE['wpml_current_language']));
+    }
+    return '';
+}
+
+function wplanguagecheck_get_wpml_preferred_language_cookie() {
+    if (!empty($_COOKIE['wp-wpml_preferred_language'])) {
+        return sanitize_text_field(wp_unslash($_COOKIE['wp-wpml_preferred_language']));
+    }
+    if (!empty($_COOKIE['_wpml_preferred_language'])) {
+        return sanitize_text_field(wp_unslash($_COOKIE['_wpml_preferred_language']));
+    }
+    if (!empty($_COOKIE['wpml_preferred_language'])) {
+        return sanitize_text_field(wp_unslash($_COOKIE['wpml_preferred_language']));
+    }
+    return '';
 }
 
 function wplanguagecheck_is_admin_user_logged_in() {
@@ -379,17 +427,20 @@ function wplanguagecheck_ajax_get_modal_context() {
     $modalContext = wplanguagecheck_get_modal_context();
     $visitorIp = wplanguagecheck_get_client_ip();
     $wpmlCurrentLanguageCookie = wplanguagecheck_get_wpml_current_language_cookie();
+    $wpmlPreferredLanguageCookie = wplanguagecheck_get_wpml_preferred_language_cookie();
 
     $preferredLanguage = !empty($modalContext['preferred_language']) ? $modalContext['preferred_language'] : 'en';
 
     $titleText = __wpl('Location confirmation title', $preferredLanguage);
+    $countryLabel = wplanguagecheck_get_country_label_by_code($modalContext['country'] ?? '', $preferredLanguage);
+    $titleText = str_replace('{country}', $countryLabel, $titleText);
 
     $other_languages = [];
     $all_languages = ['en', 'es', 'ca', 'de', 'ru', 'fr', 'en-usa'];
     foreach ($all_languages as $lang_code) {
-        if ($lang_code === strtolower($preferredLanguage)) {
+        /*if ($lang_code === strtolower($preferredLanguage)) {
             continue;
-        }
+        }*/
         $other_languages[] = [
             'code' => $lang_code,
             'label' => wplanguagecheck_get_clean_language_label($lang_code),
@@ -401,8 +452,10 @@ function wplanguagecheck_ajax_get_modal_context() {
         'cookie_name' => WPLANGUAGECHECK_COOKIE_NAME,
         'language_detected' => LANG_WPLANGUAGECHECK,
         'should_show' => !empty($modalContext['should_show']),
+        'current_language' => !empty($modalContext['current_language']) ? $modalContext['current_language'] : '',
         'visitor_ip' => $visitorIp,
         'wpml_current_language_cookie' => $wpmlCurrentLanguageCookie,
+        'wpml_preferred_language_cookie' => $wpmlPreferredLanguageCookie,
         'title_text' => $titleText,
         'other_languages' => $other_languages,
         'close_text' => __wpl('Close', $preferredLanguage),
@@ -412,6 +465,168 @@ add_action('wp_ajax_wplanguagecheck_get_modal_context', 'wplanguagecheck_ajax_ge
 add_action('wp_ajax_nopriv_wplanguagecheck_get_modal_context', 'wplanguagecheck_ajax_get_modal_context');
 
 /************************************************************
+ * Script para inyectar en el footer y controlar la lógica de idioma
+ ************************************************************/
+add_action('wp_footer', 'inyectar_script_idioma_personalizado');
+
+function inyectar_script_idioma_personalizado() {
+    // 1. No ejecutar en el admin
+    // 2. No ejecutar si estamos en el editor de Elementor (modo preview o edit)
+    if (
+        is_admin() ||
+        is_customize_preview() ||
+        isset( $_GET['elementor-preview'] ) ||
+        ( isset( $_GET['action'] ) && $_GET['action'] === 'elementor' ) ||
+        ( class_exists( '\Elementor\Plugin' ) && method_exists( \Elementor\Plugin::$instance->editor, 'is_edit_mode' ) && \Elementor\Plugin::$instance->editor->is_edit_mode() )
+    ){
+        return;
+    }
+
+
+
+    ?>
+    <script>
+        (function() {
+            const langKey = 'wpml_preferred_language';
+
+            // 1. CAPTURAR EL IDIOMA CUANDO HACEN CLIC Y MANDAR A LA URL CORRESPONDIENTE (SIN IR A LA HOME)
+            document.addEventListener('click', function(e) {
+                const link = e.target.closest('.wpml-ls-item a');
+                if (link) {
+                    const item = e.target.closest('.wpml-ls-item');
+                    const classes = item.className.split(' ');
+                    const langClass = classes.find(c => c.startsWith('wpml-ls-item-'));
+
+                    if (langClass) {
+                        const selectedLang = langClass.replace('wpml-ls-item-', '');
+
+                        // Guardamos obligatoriamente la preferencia en LocalStorage
+                        //localStorage.setItem(langKey, selectedLang);
+
+                        // Guardamos también en cookie para que el servidor y otros scripts lo detecten
+                        const exDays = 365;
+                        const date = new Date();
+                        date.setTime(date.getTime() + (exDays*24*60*60*1000));
+                        const expires = "; expires=" + date.toUTCString();
+                        document.cookie = langKey + "=" + selectedLang + expires + "; path=/";
+
+                        const targetUrl = link.getAttribute('href');
+                        const currentUrl = window.location.href;
+                        const currentPath = window.location.pathname;
+
+                        // Averiguamos si el usuario está en una página interna (producto, servicio, etc.)
+                        const esPaginaInterna = currentPath !== '/' && currentPath !== '' && currentPath !== '/en-usa/' && !/^\/[a-z]{2}\/$/.test(currentPath);
+
+                        /*if (targetUrl && targetUrl !== '#') {
+                            try {
+                                const parsedTarget = new URL(targetUrl, window.location.origin);
+                                const targetPath = parsedTarget.pathname;
+
+                                // Comprobamos si el enlace de la bandera apunta a una raíz o Home
+                                const destinoEsHome = targetPath === '/' || targetPath === '' || targetPath === '/en-usa/' || /^\/[a-z]{2}\/$/.test(targetPath);
+
+                                // SI ES INTERNA Y NOS QUIERE MANDAR A LA HOME: Frenamos la redirección
+                                if (esPaginaInterna && destinoEsHome) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    // Permanecemos en la misma URL interna actual actualizando la sesión
+                                    window.location.href = currentUrl;
+                                    return;
+                                }
+                            } catch(err) {
+                                // En caso de error de lectura, dejamos fluir el enlace nativo
+                            }
+                        }*/
+                    }
+                }
+            }, true);
+
+            // 2. REDIRECCIÓN AUTOMÁTICA EN CARGA Y BLOQUEO DE POPUP
+            /*const savedLang = localStorage.getItem(langKey);
+
+            if (savedLang) {
+                // Bloqueamos el popup inmediatamente antes de que se vea
+                const observer = new MutationObserver(function(mutations, obs) {
+                    const popup = document.querySelector('.elementor-location-popup, .elementor-popup-modal');
+                    if (popup && popup.querySelector('.wpml-ls-item')) {
+                        popup.remove();
+
+                        // LIMPIEZA DE SCROLL: Forzamos la reactivación
+                        const html = document.documentElement;
+                        const body = document.body;
+
+                        html.classList.remove('elementor-popup-is-visible', 'dialog-prevent-scroll');
+                        body.classList.remove('elementor-popup-is-visible', 'dialog-prevent-scroll');
+
+                        body.style.overflow = '';
+                        body.style.position = '';
+                        body.style.top = '';
+                        body.style.width = '';
+                        html.style.overflow = '';
+
+                        obs.disconnect(); // Dejar de observar una vez eliminado
+                    }
+                });
+                observer.observe(document.documentElement, { childList: true, subtree: true });
+
+                // Verificamos redirección en carga inicial (Solo si entra directo a una Home)
+                const currentPath = window.location.pathname;
+
+                let currentUrlLang = 'en';
+                if (currentPath.startsWith('/en-usa/')) {
+                    currentUrlLang = 'en-usa';
+                } else {
+                    const match = currentPath.match(/^\/([a-z]{2})\//);
+                    if (match) {
+                        currentUrlLang = match[1];
+                    }
+                }
+
+                if (savedLang !== currentUrlLang) {
+                    if (currentPath === '/' || currentPath === '' || currentPath === '/en-usa/' || /^\/[a-z]{2}\/$/.test(currentPath)) {
+                        let destUrl = window.location.origin;
+
+                        if (savedLang === 'en') {
+                            destUrl += '/';
+                        } else if (savedLang === 'en-usa') {
+                            destUrl += '/en-usa/';
+                        } else {
+                            destUrl += '/' + savedLang + '/';
+                        }
+
+                        if (document.body.classList.contains('admin-bar')) {
+                        console.log("¡Eres administrador/usuario registrado! Abortando script...");
+                        return;
+                        }else{
+
+                            window.location.href = destUrl;
+                        }
+
+                    }
+                }
+            }*/
+        })();
+    </script>
+    <?php
+}
+
+/************************************************************
  * Registrar Template
  ************************************************************/
 include_once( DIRECTORI_PLUGIN_WPLANGUAGECHECK . 'includes/wplanguagecheck-template.php' );
+
+
+/************************************************************
+ * Debugging for specific IP inside wp_head
+ ************************************************************/
+add_action('wp_head', function() {
+    $ip = strtolower(wplanguagecheck_get_client_ip());
+    $debug = true;
+    if ($debug) {
+        $country = wplanguagecheck_get_country_code();
+        $wpml_cookie = wplanguagecheck_get_wpml_current_language_cookie();
+        $wpml_pref_cookie = wplanguagecheck_get_wpml_preferred_language_cookie();
+        echo "\n<!-- WPLanguageCheck Debug 2 - IP: " . esc_html($ip) . " | Country: " . esc_html($country) . " | WPML Cookie: " . esc_html($wpml_cookie) . " | WPML Pref Cookie: " . esc_html($wpml_pref_cookie) . " -->\n";
+    }
+});
