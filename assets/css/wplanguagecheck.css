@@ -123,6 +123,7 @@
 
 @media (max-width: 640px) {
   #modal-wplanguagecheck .modal__overlay {
+    align-items: flex-end;
     padding: 10px;
   }
 

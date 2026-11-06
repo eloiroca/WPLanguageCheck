@@ -15,7 +15,7 @@ if (!defined('URL_PLUGIN_WPLANGUAGECHECK')) {
     define('URL_PLUGIN_WPLANGUAGECHECK', plugin_dir_url(__FILE__));
 }
 if (!defined('ASSETS_VERSION_WPLANGUAGECHECK')) {
-    define('ASSETS_VERSION_WPLANGUAGECHECK', '1.0.30');
+    define('ASSETS_VERSION_WPLANGUAGECHECK', '1.0.31');
 }
 
 if (!defined('WPLANGUAGECHECK_COOKIE_NAME')) {
